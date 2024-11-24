@@ -31,11 +31,13 @@ A sophisticated EPUB reader designed for language learning on macOS. Built with 
 ## Installation
 
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/yourusername/NaturalFlow.git
 ```
 
 2. Open the project in Xcode:
+
 ```bash
 cd NaturalFlow
 open NaturalFlow.xcodeproj
@@ -91,4 +93,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Screenshots
 
-[Add screenshots of your app here]
+![1732467227073](image/README/1732467227073.png)

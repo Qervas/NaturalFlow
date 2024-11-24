@@ -100,17 +100,42 @@ class EPUBManager: ObservableObject {
         for (index, itemref) in spine.enumerated() {
             guard let item = manifest[itemref] else { continue }
 
+            // Get the absolute URL for the chapter file
             let chapterURL = baseURL.appendingPathComponent(item.href)
-            let chapterContent = try String(contentsOf: chapterURL)
 
-            let chapter = EPUBChapter(
-                id: item.id,
-                title: item.title ?? "Chapter \(index + 1)",
-                content: cleanupHTML(chapterContent),
-                index: index
-            )
+            do {
+                // Read the chapter content
+                let chapterData = try Data(contentsOf: chapterURL)
 
-            chapters.append(chapter)
+                // Try to determine the text encoding
+                let encoding: String.Encoding
+                if let contentString = String(data: chapterData, encoding: .utf8) {
+                    encoding = .utf8
+                } else if let contentString = String(data: chapterData, encoding: .utf16) {
+                    encoding = .utf16
+                } else {
+                    encoding = .isoLatin1  // Fallback encoding
+                }
+
+                // Convert data to string using the determined encoding
+                if let chapterContent = String(data: chapterData, encoding: encoding) {
+                    let cleanContent = cleanupHTML(chapterContent)
+
+                    // Only create chapter if content is not empty
+                    if !cleanContent.isEmpty {
+                        let chapter = EPUBChapter(
+                            id: item.id,
+                            title: item.title ?? "Chapter \(index + 1)",
+                            content: cleanContent,
+                            index: index
+                        )
+                        chapters.append(chapter)
+                    }
+                }
+            } catch {
+                print("Error loading chapter at \(chapterURL): \(error)")
+                continue  // Skip problematic chapters but continue loading others
+            }
         }
 
         return chapters
@@ -146,7 +171,10 @@ class EPUBManager: ObservableObject {
                 let mediaType = item.attribute(forName: "media-type")?.stringValue
             else { continue }
 
-            manifest[id] = ManifestItem(id: id, href: href, mediaType: mediaType)
+            // Only include HTML content
+            if mediaType.contains("html") || mediaType.contains("xhtml") {
+                manifest[id] = ManifestItem(id: id, href: href, mediaType: mediaType)
+            }
         }
 
         return manifest
@@ -157,13 +185,72 @@ class EPUBManager: ObservableObject {
             throw EPUBError.invalidSpine
         }
 
+        // Get reading order from spine
         return spineElement.elements(forName: "itemref")
             .compactMap { $0.attribute(forName: "idref")?.stringValue }
     }
 
     private func cleanupHTML(_ html: String) -> String {
-        // Basic HTML cleanup
-        return html.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        // More sophisticated HTML cleanup
+        var content = html
+
+        // Remove scripts and style tags with their content
+        content = content.replacingOccurrences(
+            of: "<script[^>]*>([\\s\\S]*?)</script>",
+            with: "",
+            options: .regularExpression
+        )
+        content = content.replacingOccurrences(
+            of: "<style[^>]*>([\\s\\S]*?)</style>",
+            with: "",
+            options: .regularExpression
+        )
+
+        // Remove HTML comments
+        content = content.replacingOccurrences(
+            of: "<!--[\\s\\S]*?-->",
+            with: "",
+            options: .regularExpression
+        )
+
+        // Replace common block elements with newlines
+        let blockElements = ["p", "div", "h[1-6]", "br", "li", "tr"]
+        for element in blockElements {
+            content = content.replacingOccurrences(
+                of: "</?\(element)[^>]*>",
+                with: "\n",
+                options: .regularExpression
+            )
+        }
+
+        // Remove remaining HTML tags
+        content = content.replacingOccurrences(
+            of: "<[^>]+>",
+            with: "",
+            options: .regularExpression
+        )
+
+        // Fix whitespace
+        content = content.replacingOccurrences(
+            of: "\\s+",
+            with: " ",
+            options: .regularExpression
+        )
+        content = content.replacingOccurrences(
+            of: "\n\\s+", with: "\n", options: .regularExpression)
+        content = content.replacingOccurrences(
+            of: "\\s+\n", with: "\n", options: .regularExpression)
+        content = content.replacingOccurrences(of: "\n+", with: "\n\n", options: .regularExpression)
+
+        // Decode HTML entities
+        content = content.replacingOccurrences(of: "&nbsp;", with: " ")
+        content = content.replacingOccurrences(of: "&quot;", with: "\"")
+        content = content.replacingOccurrences(of: "&apos;", with: "'")
+        content = content.replacingOccurrences(of: "&lt;", with: "<")
+        content = content.replacingOccurrences(of: "&gt;", with: ">")
+        content = content.replacingOccurrences(of: "&amp;", with: "&")
+
+        return content.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func saveProgress() {

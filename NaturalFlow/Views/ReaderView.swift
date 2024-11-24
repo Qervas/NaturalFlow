@@ -8,9 +8,10 @@ struct ReaderView: View {
     @StateObject private var epubManager = EPUBManager()
     @State private var showSettings = false
     @State private var showSidebar = false
-    @State private var selectedWord: Word?
     @State private var learningWords: Set<String> = []
     @State private var currentBookId: String?
+    @State private var selectedWord: Word?
+    @State private var showWordCard = false
 
     init(book: Book) {
         self.book = book
@@ -78,20 +79,36 @@ struct ReaderView: View {
                 print("Error loading EPUB: \(error)")
             }
         }
+        .sheet(item: $selectedWord) { word in
+            WordCard(
+                word: word,
+                isInLearningList: learningWords.contains(word.term)
+            ) { isLearning in
+                if isLearning {
+                    learningWords.insert(word.term)
+                } else {
+                    learningWords.remove(word.term)
+                }
+            }
+            .frame(width: 300, height: 400)
+        }
     }
 
     private func handleWordSelection(_ word: String) {
-        // Here you would typically:
-        // 1. Look up the word in your dictionary
-        // 2. Create a Word object with the translation
-        // 3. Set it as the selectedWord
+        guard !word.isEmpty else { return }
+
+        // Create a new word object
         let newWord = Word(
-            term: word,
+            term: word.trimmingCharacters(in: .whitespacesAndNewlines),
             translation: "Translation goes here",  // Replace with actual translation
             pronunciation: "Pronunciation goes here",  // Replace with actual pronunciation
             category: .basics
         )
-        selectedWord = newWord
+
+        // Update the selected word state
+        DispatchQueue.main.async {
+            self.selectedWord = newWord
+        }
     }
 }
 
@@ -115,12 +132,14 @@ struct ReaderContentView: View {
                 // Main content
                 TextView(
                     text: content,
-                    font: NSFont(name: settings.fontName, size: settings.fontSize)
+                    font: NSFont(
+                        name: ReaderSettings.availableFonts[settings.fontName]
+                            ?? ".AppleSystemUIFont", size: settings.fontSize)
                         ?? .systemFont(ofSize: settings.fontSize),
-                    textColor: NSColor(cgColor: settings.theme.textColor.cgColor!)!,
+                    textColor: NSColor(settings.theme.textColor),
                     lineSpacing: settings.lineSpacing,
                     onWordSelected: onWordSelected,
-                    settings: settings  // Pass settings to TextView
+                    settings: settings
                 )
                 .frame(
                     maxWidth: min(geometry.size.width, min(geometry.size.width * 0.9, 800)),
@@ -167,12 +186,13 @@ struct ReaderContentView: View {
         .background(settings.theme.backgroundColor)
         .animation(.easeOut(duration: 0.2), value: settings.fontSize)
         .animation(.easeOut(duration: 0.2), value: settings.lineSpacing)
+        .animation(.easeOut(duration: 0.2), value: settings.theme.id)
         .onHover { isHovered in
             withAnimation {
                 showControls = isHovered
             }
         }
-        .onChange(of: content) { _ in
+        .onChange(of: content) { oldValue, newValue in
             // Reset state when content changes
             scrollPosition = 0
             contentWidth = 0

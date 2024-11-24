@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 struct ReaderTheme: Identifiable, Codable {
     let id: String
@@ -35,8 +35,8 @@ struct ReaderTheme: Identifiable, Codable {
 
     static let defaults: [ReaderTheme] = [
         ReaderTheme(
-            id: "light",
-            name: "Light",
+            id: "system",
+            name: "System",
             backgroundColor: Color(nsColor: .textBackgroundColor),
             textColor: Color(nsColor: .textColor),
             fontName: "New York",
@@ -47,8 +47,8 @@ struct ReaderTheme: Identifiable, Codable {
         ReaderTheme(
             id: "dark",
             name: "Dark",
-            backgroundColor: Color(nsColor: NSColor.init(white: 0.12, alpha: 1)),
-            textColor: Color(nsColor: NSColor.init(white: 0.9, alpha: 1)),
+            backgroundColor: Color(nsColor: NSColor(white: 0.12, alpha: 1)),
+            textColor: Color(nsColor: NSColor(white: 0.9, alpha: 1)),
             fontName: "New York",
             fontSize: 16,
             lineSpacing: 1.4,
@@ -63,7 +63,7 @@ struct ReaderTheme: Identifiable, Codable {
             fontSize: 16,
             lineSpacing: 1.4,
             paragraphSpacing: 12
-        )
+        ),
     ]
 }
 
@@ -79,9 +79,9 @@ private struct ColorComponents: Codable {
         var green: CGFloat = 0
         var blue: CGFloat = 0
         var alpha: CGFloat = 0
-        
+
         nsColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-        
+
         self.red = Double(red)
         self.green = Double(green)
         self.blue = Double(blue)
@@ -98,31 +98,35 @@ extension Color {
             opacity: components.opacity
         )
     }
-    
+
     init(nsColor: NSColor) {
         let color = nsColor.usingColorSpace(.deviceRGB) ?? .black
         var red: CGFloat = 0
         var green: CGFloat = 0
         var blue: CGFloat = 0
         var alpha: CGFloat = 0
-        
+
         color.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-        self.init(red: Double(red), green: Double(green), blue: Double(blue), opacity: Double(alpha))
+        self.init(
+            red: Double(red), green: Double(green), blue: Double(blue), opacity: Double(alpha))
     }
 }
 
 extension ReaderTheme {
     static func systemTheme(for colorScheme: ColorScheme) -> ReaderTheme {
-        let baseTheme = colorScheme == .dark ? defaults[1] : defaults[0]
-        return ReaderTheme(
+        ReaderTheme(
             id: "system",
             name: "System",
-            backgroundColor: Color(nsColor: colorScheme == .dark ? .black : .white),
-            textColor: Color(nsColor: colorScheme == .dark ? .white : .black),
-            fontName: baseTheme.fontName,
-            fontSize: baseTheme.fontSize,
-            lineSpacing: baseTheme.lineSpacing,
-            paragraphSpacing: baseTheme.paragraphSpacing
+            backgroundColor: colorScheme == .dark
+                ? Color(nsColor: NSColor(white: 0.12, alpha: 1))
+                : Color(nsColor: .textBackgroundColor),
+            textColor: colorScheme == .dark
+                ? Color(nsColor: NSColor(white: 0.9, alpha: 1)) : Color(nsColor: .textColor),
+            fontName: "New York",
+            fontSize: 16,
+            lineSpacing: 1.4,
+            paragraphSpacing: 12
         )
     }
+
 }

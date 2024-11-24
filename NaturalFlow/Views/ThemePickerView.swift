@@ -38,11 +38,19 @@ struct ThemeButton: View {
         Button(action: action) {
             VStack(spacing: 4) {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(theme.backgroundColor)
+                    .fill(
+                        theme.id == "system"
+                            ? ReaderTheme.systemTheme(for: colorScheme).backgroundColor
+                            : theme.backgroundColor
+                    )
                     .frame(width: 44, height: 44)
                     .overlay(
                         Text("Aa")
-                            .foregroundColor(theme.textColor)
+                            .foregroundColor(
+                                theme.id == "system"
+                                    ? ReaderTheme.systemTheme(for: colorScheme).textColor
+                                    : theme.textColor
+                            )
                             .font(.system(size: 14, weight: .medium))
                     )
                     .overlay(
@@ -52,7 +60,6 @@ struct ThemeButton: View {
                                 lineWidth: 2
                             )
                     )
-                    .environment(\.colorScheme, theme.id == "system" ? colorScheme : .light)
 
                 Text(theme.name)
                     .font(.caption2)
