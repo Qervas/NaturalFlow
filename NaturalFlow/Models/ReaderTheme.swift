@@ -1,6 +1,5 @@
-import Foundation
-import SwiftData
 import SwiftUI
+import AppKit
 
 struct ReaderTheme: Identifiable, Codable {
     let id: String
@@ -38,9 +37,9 @@ struct ReaderTheme: Identifiable, Codable {
         ReaderTheme(
             id: "light",
             name: "Light",
-            backgroundColor: .white,
-            textColor: .black,
-            fontName: "Georgia",
+            backgroundColor: Color(nsColor: .textBackgroundColor),
+            textColor: Color(nsColor: .textColor),
+            fontName: "New York",
             fontSize: 16,
             lineSpacing: 1.4,
             paragraphSpacing: 12
@@ -48,9 +47,9 @@ struct ReaderTheme: Identifiable, Codable {
         ReaderTheme(
             id: "dark",
             name: "Dark",
-            backgroundColor: Color(white: 0.1),
-            textColor: .white,
-            fontName: "Georgia",
+            backgroundColor: Color(nsColor: NSColor.init(white: 0.12, alpha: 1)),
+            textColor: Color(nsColor: NSColor.init(white: 0.9, alpha: 1)),
+            fontName: "New York",
             fontSize: 16,
             lineSpacing: 1.4,
             paragraphSpacing: 12
@@ -60,11 +59,11 @@ struct ReaderTheme: Identifiable, Codable {
             name: "Sepia",
             backgroundColor: Color(red: 0.98, green: 0.95, blue: 0.9),
             textColor: Color(red: 0.35, green: 0.25, blue: 0.15),
-            fontName: "Georgia",
+            fontName: "New York",
             fontSize: 16,
             lineSpacing: 1.4,
             paragraphSpacing: 12
-        ),
+        )
     ]
 }
 
@@ -75,41 +74,55 @@ private struct ColorComponents: Codable {
     let opacity: Double
 
     init(color: Color) {
+        let nsColor = NSColor(color).usingColorSpace(.deviceRGB) ?? .black
         var red: CGFloat = 0
         var green: CGFloat = 0
         var blue: CGFloat = 0
-        var opacity: CGFloat = 0
-
-        #if os(macOS)
-            NSColor(color).getRed(&red, green: &green, blue: &blue, alpha: &opacity)
-        #else
-            UIColor(color).getRed(&red, green: &green, blue: &blue, alpha: &opacity)
-        #endif
-
+        var alpha: CGFloat = 0
+        
+        nsColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        
         self.red = Double(red)
         self.green = Double(green)
         self.blue = Double(blue)
-        self.opacity = Double(opacity)
+        self.opacity = Double(alpha)
     }
 }
 
 extension Color {
     fileprivate init(components: ColorComponents) {
         self.init(
-            red: components.red, green: components.green, blue: components.blue,
-            opacity: components.opacity)
+            red: components.red,
+            green: components.green,
+            blue: components.blue,
+            opacity: components.opacity
+        )
+    }
+    
+    init(nsColor: NSColor) {
+        let color = nsColor.usingColorSpace(.deviceRGB) ?? .black
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        
+        color.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        self.init(red: Double(red), green: Double(green), blue: Double(blue), opacity: Double(alpha))
     }
 }
 
 extension ReaderTheme {
-    static let elegant = ReaderTheme(
-        id: "elegant",
-        name: "Elegant",
-        backgroundColor: Color(red: 0.98, green: 0.97, blue: 0.95),
-        textColor: Color(red: 0.2, green: 0.2, blue: 0.2),
-        fontName: "New York",
-        fontSize: 16,
-        lineSpacing: 1.4,
-        paragraphSpacing: 12
-    )
+    static func systemTheme(for colorScheme: ColorScheme) -> ReaderTheme {
+        let baseTheme = colorScheme == .dark ? defaults[1] : defaults[0]
+        return ReaderTheme(
+            id: "system",
+            name: "System",
+            backgroundColor: Color(nsColor: colorScheme == .dark ? .black : .white),
+            textColor: Color(nsColor: colorScheme == .dark ? .white : .black),
+            fontName: baseTheme.fontName,
+            fontSize: baseTheme.fontSize,
+            lineSpacing: baseTheme.lineSpacing,
+            paragraphSpacing: baseTheme.paragraphSpacing
+        )
+    }
 }

@@ -16,6 +16,15 @@ class EPUBManager: ObservableObject {
         self.readingProgress = ReadingProgress(chapterIndex: 0, position: 0, lastReadDate: Date())
     }
 
+    func reset() {
+        chapters = []
+        currentChapter = nil
+        metadata = nil
+        readingProgress = ReadingProgress(chapterIndex: 0, position: 0, lastReadDate: Date())
+        cleanup()
+    }
+
+    @MainActor
     func loadEPUB(from url: URL) async throws {
         isLoading = true
         defer { isLoading = false }
@@ -43,16 +52,22 @@ class EPUBManager: ObservableObject {
     private func parseContainerXML(at url: URL) throws -> String {
         let containerData = try Data(contentsOf: url)
         let xml = try XMLDocument(data: containerData, options: [])
-        
+
         guard let rootElement = xml.rootElement(),
-              let rootfiles = rootElement.elements(forName: "rootfiles").first,
-              let rootfile = rootfiles.elements(forName: "rootfile").first,
-              let opfPath = rootfile.attribute(forName: "full-path")?.stringValue
+            let rootfiles = rootElement.elements(forName: "rootfiles").first,
+            let rootfile = rootfiles.elements(forName: "rootfile").first,
+            let opfPath = rootfile.attribute(forName: "full-path")?.stringValue
         else {
             throw EPUBError.invalidContainer
         }
 
         return opfPath
+    }
+
+    @MainActor
+    private func updateState(with newChapters: [EPUBChapter]) {
+        self.chapters = newChapters
+        self.currentChapter = newChapters.first
     }
 
     private func parseOPFFile(at url: URL) async throws {
@@ -74,11 +89,7 @@ class EPUBManager: ObservableObject {
         // Load chapters
         let newChapters = try await loadChapters(
             spine: spine, manifest: manifest, baseURL: url.deletingLastPathComponent())
-
-        await MainActor.run {
-            self.chapters = newChapters
-            self.currentChapter = newChapters.first
-        }
+        await updateState(with: newChapters)
     }
 
     private func loadChapters(spine: [String], manifest: [String: ManifestItem], baseURL: URL)
@@ -164,7 +175,9 @@ class EPUBManager: ObservableObject {
     func cleanup() {
         if let extractedPath = extractedPath {
             try? FileManager.default.removeItem(at: extractedPath)
+            self.extractedPath = nil
         }
+        self.epubURL = nil
     }
 
     deinit {

@@ -7,9 +7,10 @@ struct ReaderView: View {
     @StateObject private var progressManager: ReadingProgressManager
     @StateObject private var epubManager = EPUBManager()
     @State private var showSettings = false
-    @State private var showChapters = false
+    @State private var showSidebar = false
     @State private var selectedWord: Word?
     @State private var learningWords: Set<String> = []
+    @State private var currentBookId: String?
 
     init(book: Book) {
         self.book = book
@@ -17,85 +18,60 @@ struct ReaderView: View {
     }
 
     var body: some View {
-        HSplitView {
+        HStack(spacing: 0) {
+            // Main content
             ZStack {
                 readerContent
-                    .padding(.horizontal, 40)  // Add comfortable reading margins
+                    .padding(.horizontal, 40)
 
-                // Reading progress overlay at the bottom
+                // Bottom navigation overlay
                 VStack {
                     Spacer()
-                    HStack {
-                        Button(action: navigateToPreviousChapter) {
-                            Label("Previous", systemImage: "chevron.left")
-                                .labelStyle(.iconOnly)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(epubManager.currentChapter == epubManager.chapters.first)
-
-                        Spacer()
-
-                        // Chapter progress
-                        Text("\(epubManager.currentChapter?.title ?? "")")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        Spacer()
-
-                        Button(action: navigateToNextChapter) {
-                            Label("Next", systemImage: "chevron.right")
-                                .labelStyle(.iconOnly)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(epubManager.currentChapter == epubManager.chapters.last)
+                    if !showSidebar {
+                        NavigationBar(
+                            chapter: epubManager.currentChapter,
+                            onPrevious: navigateToPreviousChapter,
+                            onNext: navigateToNextChapter,
+                            isFirstChapter: epubManager.currentChapter
+                                == epubManager.chapters.first,
+                            isLastChapter: epubManager.currentChapter == epubManager.chapters.last
+                        )
                     }
-                    .padding(8)
-                    .background(.thinMaterial)
-                    .cornerRadius(8)
                 }
-                .padding()
-                .opacity(0.8)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            if let word = selectedWord {
-                WordCard(word: word, isInLearningList: learningWords.contains(word.term)) {
-                    isAdded in
-                    if isAdded {
-                        learningWords.insert(word.term)
-                    } else {
-                        learningWords.remove(word.term)
-                    }
-                }
+            // Sidebar
+            if showSidebar {
+                ReaderSidebar(
+                    chapters: epubManager.chapters,
+                    currentChapter: $epubManager.currentChapter,
+                    settings: settings
+                )
                 .frame(width: 300)
-                .background(.thinMaterial)
+                .transition(.move(edge: .trailing))
             }
         }
         .navigationTitle(book.title)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
-                    showChapters.toggle()
+                    withAnimation(.spring()) {
+                        showSidebar.toggle()
+                    }
                 } label: {
-                    Label("Chapters", systemImage: "list.bullet")
+                    Label("Contents", systemImage: "sidebar.right")
                 }
-                .help("Chapters")
-
-                Button {
-                    showSettings.toggle()
-                } label: {
-                    Label("Appearance", systemImage: "textformat.size")
-                }
-                .help("Appearance")
+                .help("Toggle Sidebar")
             }
         }
-        .sheet(isPresented: $showSettings) {
-            ReaderSettingsView(settings: settings)
-        }
-        .sheet(isPresented: $showChapters) {
-            ChaptersView(
-                chapters: epubManager.chapters, currentChapter: $epubManager.currentChapter)
-        }
-        .task {
+        .task(id: book.id) {  // Add id parameter to task
+            // Reset state if book changed
+            if currentBookId != book.id {
+                epubManager.reset()
+                currentBookId = book.id
+            }
+
             do {
                 try await epubManager.loadEPUB(from: URL(fileURLWithPath: book.filePath))
             } catch {
@@ -124,17 +100,103 @@ struct ReaderContentView: View {
     @ObservedObject var settings: ReaderSettings
     let onWordSelected: (String) -> Void
 
+    // State for tracking scroll position and UI
+    @State private var scrollPosition: CGFloat = 0
+    @State private var showControls: Bool = false
+    @State private var lastScrollTime: Date = Date()
+    @State private var contentWidth: CGFloat = 0
+    @State private var lastContent: String = ""
+
+    private let controlsFadeDelay: TimeInterval = 2
+
     var body: some View {
-        TextView(
-            text: content,
-            font: NSFont(name: settings.fontName, size: settings.fontSize)
-                ?? .systemFont(ofSize: settings.fontSize),
-            textColor: NSColor(cgColor: settings.theme.textColor.cgColor!)!,
-            lineSpacing: settings.lineSpacing,
-            onWordSelected: onWordSelected
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        GeometryReader { geometry in
+            ZStack(alignment: .center) {
+                // Main content
+                TextView(
+                    text: content,
+                    font: NSFont(name: settings.fontName, size: settings.fontSize)
+                        ?? .systemFont(ofSize: settings.fontSize),
+                    textColor: NSColor(cgColor: settings.theme.textColor.cgColor!)!,
+                    lineSpacing: settings.lineSpacing,
+                    onWordSelected: onWordSelected,
+                    settings: settings  // Pass settings to TextView
+                )
+                .frame(
+                    maxWidth: min(geometry.size.width, min(geometry.size.width * 0.9, 800)),
+                    maxHeight: .infinity,
+                    alignment: .center
+                )
+                .padding(.horizontal, calculateHorizontalPadding(for: geometry.size.width))
+                .background(
+                    GeometryReader { proxy in
+                        Color.clear.preference(
+                            key: ScrollOffsetPreferenceKey.self,
+                            value: proxy.frame(in: .named("scroll")).minY
+                        )
+                    }
+                )
+
+                // Reading progress indicator
+                VStack {
+                    Spacer()
+                    if showControls {
+                        ReadingProgressBar(progress: calculateProgress())
+                            .frame(height: 2)
+                            .padding(.horizontal)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                }
+            }
+            .coordinateSpace(name: "scroll")
+            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                scrollPosition = value
+                showControls = true
+                lastScrollTime = Date()
+
+                // Hide controls after delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + controlsFadeDelay) {
+                    if Date().timeIntervalSince(lastScrollTime) >= controlsFadeDelay {
+                        withAnimation {
+                            showControls = false
+                        }
+                    }
+                }
+            }
+        }
         .background(settings.theme.backgroundColor)
+        .animation(.easeOut(duration: 0.2), value: settings.fontSize)
+        .animation(.easeOut(duration: 0.2), value: settings.lineSpacing)
+        .onHover { isHovered in
+            withAnimation {
+                showControls = isHovered
+            }
+        }
+        .onChange(of: content) { _ in
+            // Reset state when content changes
+            scrollPosition = 0
+            contentWidth = 0
+        }
+    }
+
+    // Calculate horizontal padding based on window width
+    private func calculateHorizontalPadding(for width: CGFloat) -> CGFloat {
+        let baseWidth: CGFloat = 800  // Ideal reading width
+        let minimumPadding: CGFloat = 20
+
+        if width <= baseWidth + (minimumPadding * 2) {
+            return minimumPadding
+        } else {
+            return (width - baseWidth) / 2
+        }
+    }
+
+    // Calculate reading progress
+    private func calculateProgress() -> Double {
+        let visibleHeight = -scrollPosition
+        let totalHeight = contentWidth
+        guard totalHeight > 0 else { return 0 }
+        return min(max(visibleHeight / totalHeight, 0), 1)
     }
 }
 
@@ -169,7 +231,27 @@ struct ChapterProgressOverlay: View {
         .padding()
     }
 }
+// Reading progress bar component
+struct ReadingProgressBar: View {
+    let progress: Double
 
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.2))
+
+                Rectangle()
+                    .fill(Color.accentColor)
+                    .frame(width: geometry.size.width * progress)
+                    .animation(.linear(duration: 0.1), value: progress)
+            }
+        }
+        .cornerRadius(1)
+    }
+}
+
+// Preference key for scroll position
 struct ScrollOffsetPreferenceKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
@@ -177,161 +259,43 @@ struct ScrollOffsetPreferenceKey: PreferenceKey {
     }
 }
 
-struct TextView: NSViewRepresentable {
-    typealias NSViewType = NSScrollView
-    let text: String
-    let font: NSFont
-    let textColor: NSColor
-    let lineSpacing: CGFloat
-    let onWordSelected: (String) -> Void
-
-    func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSScrollView()
-        scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = false
-        scrollView.autohidesScrollers = false
-
-        let textView = NSTextView(frame: .zero)
-        textView.isEditable = false
-        textView.isSelectable = true
-        textView.backgroundColor = .clear
-        textView.delegate = context.coordinator
-
-        // Set up text container
-        textView.textContainer?.lineFragmentPadding = 0
-        textView.textContainer?.widthTracksTextView = true
-
-        // Configure text view
-        textView.isVerticallyResizable = true
-        textView.isHorizontallyResizable = false
-        textView.autoresizingMask = [.width]
-
-        // Set up scroll view
-        scrollView.documentView = textView
-        scrollView.drawsBackground = false
-
-        return scrollView
-    }
-
-    func updateNSView(_ scrollView: NSScrollView, context: Context) {
-        guard let textView = scrollView.documentView as? NSTextView else { return }
-
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.lineSpacing = lineSpacing
-
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: textColor,
-            .paragraphStyle: paragraphStyle,
-        ]
-
-        let attributedString = NSAttributedString(string: text, attributes: attributes)
-        textView.textStorage?.setAttributedString(attributedString)
-
-        // Update layout
-        textView.layoutManager?.ensureLayout(for: textView.textContainer!)
-
-        // Set frame to fit content
-        if let layoutManager = textView.layoutManager,
-            let container = textView.textContainer
-        {
-            let size = layoutManager.usedRect(for: container).size
-            textView.frame.size = size
-        }
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onWordSelected: onWordSelected)
-    }
-
-    class Coordinator: NSObject, NSTextViewDelegate {
-        let onWordSelected: (String) -> Void
-
-        init(onWordSelected: @escaping (String) -> Void) {
-            self.onWordSelected = onWordSelected
-        }
-
-        func textView(_ textView: NSTextView, clickedOnLink link: Any, at charIndex: Int) -> Bool {
-            if let selectedText = textView.selectedText, !selectedText.isEmpty {
-                onWordSelected(selectedText)
-                return true
-            }
-            return false
-        }
-    }
-}
-
-extension NSColor {
-    convenience init(_ color: Color) {
-        self.init(cgColor: color.cgColor ?? .black)!
-    }
-}
-
-extension NSTextView {
-    var selectedText: String? {
-        guard let range = selectedRanges.first as? NSRange,
-            let text = textStorage?.string
-        else { return nil }
-        return (text as NSString).substring(with: range)
-    }
-}
-
-struct ThemePickerView: View {
-    @Binding var selectedTheme: ReaderTheme
+// Helper view for measuring content size
+struct ContentSizeReader: View {
+    let content: String
+    @Binding var contentWidth: CGFloat
 
     var body: some View {
-        HStack(spacing: 12) {
-            ForEach(ReaderTheme.defaults) { theme in
-                ThemeButton(theme: theme, isSelected: theme.id == selectedTheme.id) {
-                    selectedTheme = theme
+        Text(content)
+            .fixedSize(horizontal: false, vertical: true)
+            .background(
+                GeometryReader { geometry in
+                    Color.clear.preference(
+                        key: ContentSizePreferenceKey.self,
+                        value: geometry.size.width
+                    )
                 }
+            )
+            .onPreferenceChange(ContentSizePreferenceKey.self) { width in
+                contentWidth = width
             }
-        }
-        .padding(.vertical, 8)
     }
 }
 
-struct ThemeButton: View {
-    let theme: ReaderTheme
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(theme.backgroundColor)
-                .frame(width: 44, height: 44)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(
-                            isSelected ? Color.accentColor : Color.gray.opacity(0.3), lineWidth: 2)
-                )
-        }
-        .buttonStyle(.plain)
+struct ContentSizePreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 
-struct ThemeRow: View {
-    let theme: ReaderTheme
-    let isSelected: Bool
-
-    var body: some View {
-        HStack {
-            Circle()
-                .fill(theme.backgroundColor)
-                .frame(width: 20, height: 20)
-                .overlay(Circle().stroke(theme.textColor, lineWidth: 1))
-
-            Text(theme.name)
-
-            Spacer()
-
-            if isSelected {
-                Image(systemName: "checkmark")
-                    .foregroundColor(.accentColor)
-            }
-        }
-    }
+// Preview provider
+#Preview {
+    ReaderContentView(
+        content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit...",
+        settings: ReaderSettings(),
+        onWordSelected: { _ in }
+    )
+    .frame(width: 800, height: 600)
 }
 
 extension ReaderView {
@@ -376,5 +340,45 @@ extension ReaderView {
         withAnimation {
             epubManager.currentChapter = epubManager.chapters[currentIndex - 1]
         }
+    }
+}
+
+struct NavigationBar: View {
+    let chapter: EPUBChapter?
+    let onPrevious: () -> Void
+    let onNext: () -> Void
+    let isFirstChapter: Bool
+    let isLastChapter: Bool
+
+    var body: some View {
+        HStack {
+            Button(action: onPrevious) {
+                Image(systemName: "chevron.left")
+                    .imageScale(.large)
+            }
+            .buttonStyle(.plain)
+            .disabled(isFirstChapter)
+
+            Spacer()
+
+            if let chapter = chapter {
+                Text(chapter.title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button(action: onNext) {
+                Image(systemName: "chevron.right")
+                    .imageScale(.large)
+            }
+            .buttonStyle(.plain)
+            .disabled(isLastChapter)
+        }
+        .padding(8)
+        .background(.thinMaterial)
+        .cornerRadius(8)
+        .padding()
     }
 }

@@ -58,36 +58,3 @@ private struct ChaptersList: View {
     }
 }
 
-private struct ChapterRow: View {
-    let chapter: EPUBChapter
-    let isSelected: Bool
-
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Chapter \(chapter.index + 1)")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Text(chapter.title)
-                    .font(.body)
-            }
-
-            Spacer()
-
-            if isSelected {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.accentColor)
-            }
-        }
-    }
-}
-
-#Preview {
-    ChaptersView(
-        chapters: [
-            EPUBChapter(id: "1", title: "Chapter 1", content: "", index: 0),
-            EPUBChapter(id: "2", title: "Chapter 2", content: "", index: 1),
-        ],
-        currentChapter: .constant(nil)
-    )
-}
