@@ -1,6 +1,6 @@
 # NaturalFlow
 
-A sophisticated EPUB reader designed for language learning on macOS. Built with SwiftUI and modern Apple technologies, NaturalFlow offers an elegant reading experience with integrated language learning features.
+"To learn a language is to read a book." - A book reader designed for language learning on macOS. Built with SwiftUI and modern Apple technologies, NaturalFlow offers an elegant reading experience with integrated language learning features.
 
 ## Features
 
