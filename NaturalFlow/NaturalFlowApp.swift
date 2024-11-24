@@ -5,28 +5,42 @@
 //  Created by FrankYin on 2024-11-08.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 @main
 struct NaturalFlowApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+    let modelContainer: ModelContainer
 
+    init() {
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            // Define the schema with all model types
+            let schema = Schema([
+                Book.self,
+                Word.self,
+            ])
+
+            // Configure the model container
+            let modelConfiguration = ModelConfiguration(
+                schema: schema,
+                isStoredInMemoryOnly: false,
+                allowsSave: true
+            )
+
+            // Create the container
+            modelContainer = try ModelContainer(
+                for: schema,
+                configurations: [modelConfiguration]
+            )
         } catch {
-            fatalError("Could not create ModelContainer: \(error)")
+            fatalError("Could not initialize ModelContainer: \(error)")
         }
-    }()
+    }
 
     var body: some Scene {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(sharedModelContainer)
+        .modelContainer(modelContainer)
     }
 }

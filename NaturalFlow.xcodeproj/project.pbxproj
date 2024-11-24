@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		5B0E1F282CF349E800DF85DD /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 5B0E1F272CF349E800DF85DD /* ZIPFoundation */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		5B32FFB12CDDF16000D33F11 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5B0E1F282CF349E800DF85DD /* ZIPFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +117,7 @@
 			);
 			name = NaturalFlow;
 			packageProductDependencies = (
+				5B0E1F272CF349E800DF85DD /* ZIPFoundation */,
 			);
 			productName = NaturalFlow;
 			productReference = 5B32FF9D2CDDF15E00D33F11 /* NaturalFlow.app */;
@@ -195,6 +201,9 @@
 			);
 			mainGroup = 5B32FF942CDDF15E00D33F11;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				5B0E1F262CF349E800DF85DD /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5B32FF9E2CDDF15E00D33F11 /* Products */;
 			projectDirPath = "";
@@ -393,6 +402,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = NaturalFlow/NaturalFlow.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -421,6 +431,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = NaturalFlow/NaturalFlow.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -551,6 +562,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5B0E1F262CF349E800DF85DD /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/weichsel/ZIPFoundation.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.9.19;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5B0E1F272CF349E800DF85DD /* ZIPFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5B0E1F262CF349E800DF85DD /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
+			productName = ZIPFoundation;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 5B32FF952CDDF15E00D33F11 /* Project object */;
 }
